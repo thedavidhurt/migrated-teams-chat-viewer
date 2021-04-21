@@ -40,12 +40,13 @@ Viewer for migrated teams chat
 31. Open Outlook and let it re-synchronize using the new settings
 
 ### Viewing exported Teams chat
-1. Download latest .zip release: https://github.com/thedavidhurt/migrated-teams-chat-viewer
+1. Download latest migrated-teams-chat-viewer-vX.X.zip release from https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest
 2. Open the .zip file and click Extract All
 3. Choose a location and click Extract
-4. Double-click migrated-teams-chat-viewer.exe
-5. Click Browse to locate the exported .csv file
-6. Click Open to read the file
+4. Open the migrated-teams-chat-viewer-vX.X folder and double-click migrated-teams-chat-viewer.exe to run
+5. At the popup, uncheck the "Always ask before opening this file" box and click Run
+6. Click Browse to locate the exported .csv file
+7. Click Open to read the file
 
 The conversation list in the left pane can be filtered by subject or by participant names.
 The conversation on the right can be searched for text and zoomed in and out using Ctrl-Mousewheel.
