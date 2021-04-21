@@ -19,7 +19,7 @@ Viewer for migrated teams chat
 12. Close Outlook 
 13. Open Outlook 
 14. Click the "Migrated Teams Chat" folder 
-15. Watch the status at the bottom to read "This folder is up to date." This could take a while.
+15. Watch the status at the bottom and wait for it to read "This folder is up to date." This could take a while.
 ##### Start here to only export the last year of Teams chats
 16. Navigate to File > Open & Export > Import/Export > 
 17. Select "Export to a file" and click Next 
