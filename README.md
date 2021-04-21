@@ -2,6 +2,8 @@
 
 Viewer for migrated teams chat
 
+Latest executable is migrated-teams-chat-viewer-vX.X.zip at https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest
+
 ## Usage instructions
 ### Export migrated Teams chat folder to .csv file
 #### By default, Outlook only stores one year of email locally. If you only want the last year's worth of Teams chat, skip to step 16. Otherwise, follow the instructions to make Outlook download the rest of the Teams chat messages before exporting.
