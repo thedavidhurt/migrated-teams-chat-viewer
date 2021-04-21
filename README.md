@@ -48,7 +48,7 @@ Viewer for migrated teams chat
 6. Click Browse to locate the exported .csv file
 7. Click Open to read the file
 
-The conversation list in the left pane can be filtered by subject or by participant names.
+The conversation list in the left pane can be filtered by subject, participant names, or by the results of a global search.
 The conversation on the right can be searched for text and zoomed in and out using Ctrl-Mousewheel.
 
 ## Building

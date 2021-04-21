@@ -6,7 +6,7 @@
 #include <QTextStream>
 #include <QStandardPaths>
 #include <QSettings>
-#include <QTimer>
+#include <QMessageBox>
 
 #include <iostream>
 
@@ -41,12 +41,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->find_pushButton, &QPushButton::clicked, searchConvoFunction);
     connect(ui->find_lineEdit, &QLineEdit::returnPressed, searchConvoFunction);
 
-    QTimer::singleShot(0, [this]() {
-        if (QFile::exists(ui->filePath_lineEdit->text()))
-        {
-            readFile();
-        }
-    });
+    auto searchEverywhereFunction = [this]() { findEverywhere(ui->findEverywhere_lineEdit->text()); };
+    connect(ui->findEverywhere_pushButton, &QPushButton::clicked, searchEverywhereFunction);
+    connect(ui->findEverywhere_lineEdit, &QLineEdit::returnPressed, searchEverywhereFunction);
+
+    connect(ui->resetFilters_pushButton, &QPushButton::clicked, ui->convoFilter_lineEdit, &QLineEdit::clear);
+    connect(ui->resetFilters_pushButton, &QPushButton::clicked, [this]() { isFindEverywhereFilterActive = false; setConvoItems(subjects); });
+
+    if (QFile::exists(ui->filePath_lineEdit->text()))
+    {
+        readFile();
+    }
 }
 
 MainWindow::~MainWindow()
@@ -59,36 +64,48 @@ void MainWindow::getFilePath()
 {
    QString filePath = QFileDialog::getOpenFileName(this, "Open CSV file",
         QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation).first(), "CSV (Comma delimited) (*.csv);;All files (*.*)");
+
     ui->filePath_lineEdit->setText(filePath);
 }
 
 void MainWindow::readFile()
 {
+    subjects.clear();
+    bodies.clear();
+    senders.clear();
+    sendersUnique.clear();
+    isFindEverywhereFilterActive = false;
+
     QFile inFile(ui->filePath_lineEdit->text());
     loadedFilePath = ui->filePath_lineEdit->text();
 
     if (!inFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
         return;
+    }
+
+    QProgressDialog progress("Reading messages from " + loadedFilePath, "Cancel", 0, 0, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(500);
 
     QTextStream in(&inFile);
 
-    QString headers = in.readLine();
+    QString headerLine = in.readLine();
 
+    this->headers = parseLine(headerLine);
+
+    // Count messages
     int messageCount = 0;
     while (!in.atEnd())
     {
-        QString line = in.readLine();
-        while (!line.endsWith("\"Normal\""))
-        {
-            line += in.readLine();
-        }
+        progress.setValue(messageCount);
+        getLine(in);
         messageCount++;
     }
     in.seek(0);
-    headers = in.readLine();
+    headerLine = in.readLine();
 
-    QProgressDialog progress("Reading messages from " + loadedFilePath, "Cancel", 0, messageCount, this);
-    progress.setWindowModality(Qt::WindowModal);
+    progress.setMaximum(messageCount);
 
     QStringList potentialOwners;
     int readMessageCount = 0;
@@ -97,33 +114,27 @@ void MainWindow::readFile()
         progress.setValue(readMessageCount);
 
         if (progress.wasCanceled())
+        {
             break;
-
-        QString line = in.readLine();
-        while (!line.endsWith("\"Normal\""))
-        {
-            line += in.readLine();
         }
 
-        QTextStream lineStream(&line);
-        QString singleChar = lineStream.read(1);
-        bool inQuote = false;
-        QString subject;
-        while (!lineStream.atEnd())
+        QString line = getLine(in);
+        QStringList desiredFields = { "Subject", "Body", "From: (Name)" };
+        int maxFieldIndex = 0;
+        for (QString field : desiredFields)
         {
-            if (singleChar == "\"")
-                inQuote = !inQuote;
-            else if (singleChar == "," && !inQuote)
-                break;
-            else
-                subject.append(singleChar);
-            singleChar = lineStream.read(1);
-        }
+            if (!headers.contains(field))
+            {
+                progress.cancel();
+                QMessageBox::critical(this, "Parse error", "Field \"" + field + "\" was not found in CSV headers");
+                return;
+            }
 
-        if (lineStream.atEnd())
-        {
-            std::cout << "Didn't parse subject correctly" << std::endl;
+            maxFieldIndex = std::max(maxFieldIndex, headers.indexOf(field));
         }
+        QStringList fields = parseLine(line, maxFieldIndex + 1);
+
+        QString subject = fields.at(headers.indexOf("Subject"));
 
         if (!subjects.contains(subject))
         {
@@ -132,6 +143,7 @@ void MainWindow::readFile()
 
         int subjectIndex = subjects.indexOf(subject);
 
+        // Determine owner of folder by looking for common name in conversations
         if (owner.isEmpty() && subject.startsWith("Conversation with "))
         {
             QString subjectTemp = subject;
@@ -162,46 +174,12 @@ void MainWindow::readFile()
             }
         }
 
-        singleChar = lineStream.read(1);
-        inQuote = false;
-        QString body;
-        while (!lineStream.atEnd())
-        {
-            if (singleChar == "\"")
-                inQuote = !inQuote;
-            else if (singleChar == "," && !inQuote)
-                break;
-            else
-                body.append(singleChar);
-            singleChar = lineStream.read(1);
-        }
-
-        if (lineStream.atEnd())
-        {
-            std::cout << "Didn't parse body correctly" << std::endl;
-        }
+        QString body = fields.at(headers.indexOf("Body"));
 
         bodies.resize(subjects.size());
         bodies[subjectIndex].append(body);
 
-        singleChar = lineStream.read(1);
-        inQuote = false;
-        QString sender;
-        while (!lineStream.atEnd())
-        {
-            if (singleChar == "\"")
-                inQuote = !inQuote;
-            else if (singleChar == "," && !inQuote)
-                break;
-            else
-                sender.append(singleChar);
-            singleChar = lineStream.read(1);
-        }
-
-        if (lineStream.atEnd())
-        {
-            std::cout << "Didn't parse body correctly" << std::endl;
-        }
+        QString sender = fields.at(headers.indexOf("From: (Name)"));
 
         senders.resize(subjects.size());
         senders[subjectIndex].append(sender);
@@ -215,6 +193,7 @@ void MainWindow::readFile()
         readMessageCount++;
     }
 
+    // Clean up subject text
     for (QString& subject : subjects)
     {
         subject.remove("Conversation with ");
@@ -243,6 +222,12 @@ void MainWindow::readFile()
 void MainWindow::displayConvo(QString subject)
 {
     ui->convo_edit->clear();
+
+    // Remove search occurence indicator
+    if (isFindEverywhereFilterActive)
+    {
+        subject = subject.left(subject.lastIndexOf(" ("));
+    }
 
     if (subjects.contains(subject))
     {
@@ -277,12 +262,15 @@ void MainWindow::displayConvo(QString subject)
         ui->convo_edit->insertHtml(appendString);
         ui->convo_edit->moveCursor(QTextCursor::End);
     }
+
+    if (isFindEverywhereFilterActive)
+    {
+        findInConvo(ui->findEverywhere_lineEdit->text());
+    }
 }
 
 void MainWindow::filterConvos(QString filterString)
 {
-    ui->convos_listWidget->clear();
-
     QStringList filteredSubjects;
     for (QString subject : subjects)
     {
@@ -305,18 +293,71 @@ void MainWindow::filterConvos(QString filterString)
     setConvoItems(filteredSubjects);
 }
 
-void MainWindow::findInConvo(QString findString)
+bool MainWindow::findInConvo(QString findString)
 {
+    if (findString.isEmpty())
+    {
+        return false;
+    }
+
+    bool wrapped = false;
     if (!ui->convo_edit->find(findString, QTextDocument::FindBackward))
     {
         ui->convo_edit->moveCursor(QTextCursor::End);
         ui->convo_edit->find(findString, QTextDocument::FindBackward);
+        ui->convo_edit->find("\n", QTextDocument::FindBackward);
+        wrapped = true;
+    }
+    return wrapped;
+}
+
+void MainWindow::findEverywhere(QString findString)
+{
+    if (findString.isEmpty())
+    {
+        isFindEverywhereFilterActive = false;
+        setConvoItems(subjects);
+        return;
+    }
+
+    // New search string
+    if (findString != findEverywhereSearchText)
+    {
+        findEverywhereSearchText = findString;
+        QStringList filteredSubjects;
+        for (int subjectIdx = 0; subjectIdx < subjects.size(); subjectIdx++)
+        {
+            QStringList bodyList = bodies[subjectIdx];
+            int numOccurences = 0;
+            for (QString body : bodyList)
+            {
+                if (body.contains(findString))
+                {
+                    numOccurences++;
+                }
+            }
+            if (numOccurences > 0)
+            {
+                filteredSubjects.append(subjects.at(subjectIdx) + " (" + QString::number(numOccurences) + ")");
+            }
+        }
+
+        isFindEverywhereFilterActive = true;
+        setConvoItems(filteredSubjects);
+    }
+    else    // Repeated search
+    {
+        // Go to new convo if current one wrapped
+        if (findInConvo(findString))
+        {
+            ui->convos_listWidget->setCurrentRow(ui->convos_listWidget->currentRow() + 1);
+        }
     }
 }
 
-void MainWindow::setConvoItems(QStringList items)
+void MainWindow::setConvoItems(const QStringList &items)
 {
-
+    ui->convos_listWidget->clear();
     ui->convos_listWidget->addItems(items);
 
     for (int i = 0; i < ui->convos_listWidget->count(); i++)
@@ -324,6 +365,8 @@ void MainWindow::setConvoItems(QStringList items)
         QListWidgetItem* item = ui->convos_listWidget->item(i);
         item->setSizeHint(QSize(30, 30));
     }
+
+    ui->convos_listWidget->setCurrentRow(0);
 }
 
 void MainWindow::readSettings()
@@ -352,5 +395,84 @@ void MainWindow::writeSettings()
     }
     settings.setValue("currentConvo", ui->convos_listWidget->currentItem()->text());
     settings.endGroup();
+}
+
+QStringList MainWindow::parseLine(QString line, int numFieldsToParse)
+{
+    numFieldsToParse = std::min(headers.size(), numFieldsToParse);
+
+    QStringList fields;
+
+    QTextStream lineStream(&line);
+    QString singleChar = lineStream.read(1);
+    QString value;
+    bool inQuote = false;
+    while (!lineStream.atEnd())
+    {
+        bool foundCommaOutsideQuotes = false;
+        while (!foundCommaOutsideQuotes && !lineStream.atEnd())
+        {
+            if (singleChar == "\"")
+                inQuote = !inQuote;
+            else if (singleChar == "," && !inQuote)
+                foundCommaOutsideQuotes = true;
+            else
+                value.append(singleChar);
+            singleChar = lineStream.read(1);
+        }
+        fields.append(value);
+        value.clear();
+
+        // Stop parsing when we've found all requested fields
+        if (numFieldsToParse > 0 && fields.size() == numFieldsToParse)
+        {
+            break;
+        }
+    }
+
+    return fields;
+}
+
+QString MainWindow::getLine(QTextStream &in)
+{
+    QString line = in.readLine();
+
+    // Use slower line reader if fields don't match what we expect
+    if (headers.isEmpty() || headers.last() != "Sensitivity")
+    {
+        QTextStream lineStream(&line);
+
+        int numFields = 1;
+        bool inQuote = false;
+
+        QString singleChar = lineStream.read(1);
+        while (numFields < headers.size() && !in.atEnd())
+        {
+            if (singleChar == "\"")
+            {
+                inQuote = !inQuote;
+            }
+            else if (singleChar == "," && !inQuote)
+            {
+                numFields++;
+            }
+
+            if (lineStream.atEnd())
+            {
+                QString newChars = in.readLine();
+                lineStream << newChars;
+                line.append(newChars);
+            }
+            singleChar = lineStream.read(1);
+        }
+    }
+    else    // faster
+    {
+        while (!line.endsWith("\"Normal\"") && !in.atEnd())
+        {
+            line += in.readLine();
+        }
+    }
+    return line;
 }
 

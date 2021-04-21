@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTextStream>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -20,11 +21,13 @@ public slots:
     void readFile();
     void displayConvo(QString subject);
     void filterConvos(QString filterString);
-    void findInConvo(QString findString);
+    bool findInConvo(QString findString);
+    void findEverywhere(QString findString);
 
 private:
     Ui::MainWindow *ui;
 
+    QStringList headers;
     QStringList subjects;
     QVector<QStringList> senders;
     QVector<QStringList> sendersUnique;
@@ -35,8 +38,13 @@ private:
     QString savedFilePath;
     QString savedConvo;
 
-    void setConvoItems(QStringList items);
+    bool isFindEverywhereFilterActive;
+    QString findEverywhereSearchText;
+
+    void setConvoItems(const QStringList& items);
     void readSettings();
     void writeSettings();
+    QStringList parseLine(QString line, int numFieldsToParse = 0);
+    QString getLine(QTextStream& in);
 };
 #endif // MAINWINDOW_H
