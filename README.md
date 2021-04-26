@@ -2,7 +2,7 @@
 
 Viewer for migrated teams chat
 
-Latest executable is migrated-teams-chat-viewer-vX.X.zip at https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest
+Latest executable is migrated-teams-chat-viewer.zip at https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest/download/migrated-teams-chat-viewer.zip
 
 ## Usage instructions
 ### Export migrated Teams chat folder to .csv file
@@ -42,7 +42,7 @@ Latest executable is migrated-teams-chat-viewer-vX.X.zip at https://github.com/t
 31. Open Outlook and let it re-synchronize using the new settings
 
 ### Viewing exported Teams chat
-1. Download latest migrated-teams-chat-viewer-vX.X.zip release from https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest
+1. Download latest migrated-teams-chat-viewer.zip from https://github.com/thedavidhurt/migrated-teams-chat-viewer/releases/latest/download/migrated-teams-chat-viewer.zip
 2. Open the .zip file and click Extract All
 3. Choose a location and click Extract
 4. Open the migrated-teams-chat-viewer-vX.X folder and double-click migrated-teams-chat-viewer.exe to run
